@@ -6,7 +6,6 @@ import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
-MAX_PAGE = 17145
 MAX_WORKERS = 10        # Ne PAS augmenter plus de 15 pour éviter blocage IP
 RETRIES = 3
 TIMEOUT = 10
@@ -20,6 +19,23 @@ session.headers.update(headers)
 
 all_data = []
 failed_pages = []
+
+def get_max_page():
+    """Détecte automatiquement le nombre maximum de pages depuis la pagination HTML"""
+    url = "https://www.marchespublics.gov.ma/bdc/entreprise/consultation/resultat?page=1"
+    try:
+        response = session.get(url, timeout=TIMEOUT)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'lxml')
+            pagination = soup.select_one('ul.pagination')
+            if pagination:
+                page_links = pagination.select('li.page-item a.page-link')
+                page_numbers = [int(a.text.strip()) for a in page_links if a.text.strip().isdigit()]
+                return max(page_numbers) if page_numbers else 1
+        print("Impossible de détecter automatiquement le nombre de pages. Valeur par défaut : 1")
+    except Exception as e:
+        print(f"Erreur lors de la récupération du nombre de pages : {e}")
+    return 1
 
 def extract_card_data(card):
     try:
@@ -77,7 +93,7 @@ def fetch_page(page):
 
     for attempt in range(RETRIES):
         try:
-            time.sleep(random.uniform(0.4, 1.2))  # Pause pour limiter charge serveur
+            time.sleep(random.uniform(0.4, 1.2))
             response = session.get(url, timeout=TIMEOUT)
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, 'lxml')
@@ -91,7 +107,11 @@ def fetch_page(page):
     failed_pages.append(page)
     return []
 
-# Extraction multi-thread
+# 📦 Étape 1 : détecter le nombre de pages
+MAX_PAGE = get_max_page()
+print(f"Nombre total de pages détecté : {MAX_PAGE}")
+
+# 📥 Étape 2 : extraction multi-thread
 with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
     futures = {executor.submit(fetch_page, page): page for page in range(1, MAX_PAGE + 1)}
 
@@ -100,14 +120,14 @@ with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         if result:
             all_data.extend(result)
 
-# Nettoyage : enlever les enregistrements None
+# Nettoyage
 all_data = [d for d in all_data if d is not None]
 
-# Sauvegarde JSON
+# Sauvegarde
 with open("donnees_marches.json", "w", encoding='utf-8') as f:
     json.dump(all_data, f, ensure_ascii=False, indent=2)
 
-# Sauvegarde des pages échouées
+# Échecs
 if failed_pages:
     with open("pages_non_traitees.json", "w") as f:
         json.dump(failed_pages, f)
