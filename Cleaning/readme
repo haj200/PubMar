@@ -1,12 +1,7 @@
-# 🧹 Cleaning des Avis Attribués
+#  Cleaning des Avis Attribués
 
 Ce dossier contient le résultat du nettoyage des données d'avis attribués extraites à partir du projet Scrapper.
-
-## 📁 Fichier contenu
-
-- `avis_attribues_nettoyes.json` : Fichier JSON contenant les avis attribués après nettoyage et normalisation.
-
-## 🔍 Objectif du nettoyage
+##  Objectif du nettoyage
 
 L'objectif de cette étape de **cleaning** est de :
 - Gestion des doublons.
